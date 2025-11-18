@@ -43,12 +43,14 @@ export async function POST(req: Request) {
       vnp_TmnCode:  vnp_TmnCode,
       vnp_Amount:   String(Math.round(amount) * 100), // *100
       vnp_CurrCode: "VND",
-      vnp_ReturnUrl: vnp_IpnUrl,
+      //vnp_ReturnUrl: vnp_IpnUrl,
       vnp_TxnRef:   txnRef,
       vnp_OrderInfo: orderInfo,
       vnp_OrderType: "other",
       vnp_Locale:    "vn",
-      //vnp_ReturnUrl: vnp_ReturnUrl,
+      vnp_ReturnUrl: vnp_ReturnUrl,
+      //  vnp_ReturnUrl: vnp_ReturnUrl,   
+      // vnp_IpnUrl:    vnp_IpnUrl,  
       vnp_CreateDate: vnp_CreateDate,
       vnp_IpAddr:     "127.0.0.1",
       

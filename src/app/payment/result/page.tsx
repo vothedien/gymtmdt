@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function PaymentResult() {
   const q = useSearchParams();
-  const orderId = q.get("vnp_TxnRef") || q.get("orderId") || "";
+const orderId = q?.get("vnp_TxnRef") || q?.get("orderId") || "";
   const [status, setStatus] = useState("Đang kiểm tra…");
 
   useEffect(() => {

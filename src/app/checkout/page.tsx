@@ -34,8 +34,7 @@ type PaymentMethod = "VNPAY" | "MOMO";
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const planId = searchParams.get("planId");
-
+  const planId = searchParams?.get("planId") ?? "";
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
@@ -140,21 +139,16 @@ export default function CheckoutPage() {
   }, [plan]);
 
   const handleCheckout = async () => {
-    if (!plan) {
-      return;
-    }
+    if (!plan) return;
     if (!userId) {
       router.push("/#pricing");
-      return;
-    }
-    if (paymentMethod !== "VNPAY") {
-      alert("Thanh toán MoMo đang được hoàn thiện. Vui lòng chọn VNPAY nhé!");
       return;
     }
 
     try {
       setSubmitting(true);
       const invoiceId = `INV${Date.now()}`;
+
       const { error: invErr } = await supabase.from("invoices").insert({
         id: invoiceId,
         user_id: userId,
@@ -171,30 +165,58 @@ export default function CheckoutPage() {
         return;
       }
 
-      const response = await fetch("/api/vnpay/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let apiEndpoint = "";
+      let apiBody = {};
+
+      if (paymentMethod === "VNPAY") {
+        apiEndpoint = "/api/vnpay/create";
+        apiBody = {
           orderId: invoiceId,
           amount: plan.price,
           orderInfo: `Thanhtoan${plan.name}`,
-        }),
-      });
+        };
+      } else if (paymentMethod === "MOMO") {
+        apiEndpoint = "/api/momo/create";
+        apiBody = {
+          orderId: invoiceId,
+          amount: plan.price,
+          orderInfo: `Thanhtoan ${plan.name} qua MoMo`,
+        };
+      }
 
-      const result = await response.json();
-      if (!result?.ok || !result.payUrl) {
-        alert("Không tạo được link thanh toán. Vui lòng thử lại.");
+      if (!apiEndpoint) {
+        alert("Phương thức thanh toán không hợp lệ.");
         setSubmitting(false);
         return;
       }
 
-      window.location.href = result.payUrl as string;
+      const response = await fetch(apiEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apiBody),
+      });
+
+      const result = await response.json();
+
+      // 4. Kiểm tra kết quả (VNPAY trả về payUrl, API MoMo của bạn trả về url hoặc payUrl tùy cách bạn viết)
+      const payUrl = result.payUrl || result.url;
+
+      if (!response.ok || !payUrl) {
+        alert(`Không tạo được link thanh toán ${paymentMethod}. Vui lòng thử lại.`);
+        setSubmitting(false);
+        return;
+      }
+
+      // 5. Chuyển hướng
+      window.location.href = payUrl as string;
+
     } catch (error) {
       console.error(error);
       alert("Có lỗi xảy ra. Vui lòng thử lại sau.");
       setSubmitting(false);
     }
   };
+  // --- KẾT THÚC HÀM XỬ LÝ ---
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-10">
@@ -346,6 +368,7 @@ export default function CheckoutPage() {
                     </div>
                   </button>
 
+                  {/* --- NÚT MOMO ĐÃ ĐƯỢC MỞ KHÓA --- */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("MOMO")}
@@ -362,12 +385,12 @@ export default function CheckoutPage() {
                         </div>
                         <div>
                           <p className="font-medium text-slate-900">MoMo</p>
-                          <p className="text-sm text-slate-500">Sẽ ra mắt sớm. Hỗ trợ thanh toán ví điện tử MoMo.</p>
+                          <p className="text-sm text-slate-500">Thanh toán an toàn qua ví điện tử MoMo.</p>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="bg-rose-100 text-rose-600">
-                        Sắp ra mắt
-                      </Badge>
+                      {paymentMethod === "MOMO" && (
+                        <Badge className="bg-rose-500 text-white">Đang chọn</Badge>
+                      )}
                     </div>
                   </button>
                 </CardContent>
@@ -376,22 +399,18 @@ export default function CheckoutPage() {
                     size="lg"
                     className="w-full"
                     onClick={handleCheckout}
-                    disabled={submitting || paymentMethod !== "VNPAY"}
+                    disabled={submitting || (sessionChecked && !userId)}
                   >
                     {submitting ? (
                       <span className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Đang tạo liên kết VNPAY...
+                        Đang tạo liên kết {paymentMethod}...
                       </span>
                     ) : (
-                      "Thanh toán với VNPAY"
+                      `Thanh toán với ${paymentMethod}`
                     )}
                   </Button>
-                  {paymentMethod === "MOMO" && (
-                    <p className="text-sm text-rose-500">
-                      Cổng thanh toán MoMo đang được hoàn thiện, vui lòng chọn VNPAY trong thời gian này.
-                    </p>
-                  )}
+                  
                   {sessionChecked && !userId && (
                     <p className="text-sm text-amber-600">
                       Vui lòng đăng nhập tại trang chủ để hoàn tất thanh toán.
