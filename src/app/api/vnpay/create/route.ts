@@ -49,8 +49,8 @@ export async function POST(req: Request) {
       vnp_OrderType: "other",
       vnp_Locale:    "vn",
       vnp_ReturnUrl: vnp_ReturnUrl,
-      //  vnp_ReturnUrl: vnp_ReturnUrl,   
-       vnp_IpnUrl:    vnp_IpnUrl,  
+      // vnp_ReturnUrl: vnp_ReturnUrl,   
+      // vnp_IpnUrl:    vnp_IpnUrl,  
       vnp_CreateDate: vnp_CreateDate,
       vnp_IpAddr:     "127.0.0.1",
       
