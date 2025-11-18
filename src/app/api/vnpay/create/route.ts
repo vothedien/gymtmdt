@@ -35,8 +35,7 @@ export async function POST(req: Request) {
     const pad = (n:number)=> n.toString().padStart(2,"0");
     const vnp_CreateDate = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 
-      const txnRef = (String(orderId).replace(/\D/g,"") || String(Date.now())).slice(0,32);
-
+    const txnRef = String(orderId).slice(0, 32);
     const params: Record<string,string> = {
       vnp_Version:  "2.1.0",
       vnp_Command:  "pay",
