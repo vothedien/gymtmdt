@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-export default function PaymentResultLayout({
+export default function PaymentReturnLayout({
   children,
 }: {
   children: React.ReactNode;
