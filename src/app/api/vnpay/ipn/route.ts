@@ -2,10 +2,6 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SUPABASE_ANON_KEY!
-);
 
 function sortObject(obj: Record<string, string>) {
   const sorted: Record<string, string> = {};
@@ -16,7 +12,11 @@ function sortObject(obj: Record<string, string>) {
 // ✅ VNPAY IPN sử dụng method GET
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SUPABASE_ANON_KEY!
+);
+
   // 1. Lấy dữ liệu từ Query Params
   const rawParams: Record<string, string> = {};
   searchParams.forEach((value, key) => {
