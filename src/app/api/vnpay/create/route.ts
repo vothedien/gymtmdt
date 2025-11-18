@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-// encoder kiểu RFC3986: space = %20 (tương tự rawurlencode)
-function encodeRFC3986(str: string) {
-  return encodeURIComponent(str)
-    .replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-}
 
 function sortObject(obj: Record<string, string>) {
   const out: Record<string, string> = {};
@@ -16,8 +11,8 @@ function sortObject(obj: Record<string, string>) {
 function buildQuery(obj: Record<string, string>) {
   // dùng cùng 1 encoder cho CẢ ký và redirect
   return Object.keys(obj)
-    .map(k => `${k}=${encodeRFC3986(obj[k])}`)
-    .join("&");
+    .map(k => `${k}=${encodeURIComponent(obj[k])}`)
+    .join("&");
 }
 
 export async function POST(req: Request) {

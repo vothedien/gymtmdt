@@ -36,18 +36,16 @@ export async function GET(req: Request) {
   const secret = process.env.VNP_HASH_SECRET!;
   const sorted = sortObject(rawParams);
   
-  // Lưu ý: VNPAY dùng querystring chuẩn (mã hóa URI) khi tạo chữ ký
   const signData = Object.entries(sorted)
-    .map(([k, v]) => `${k}=${v}`) // Nếu cần thiết: encodeURIComponent(v)
-    .join("&"); 
-    // Trong JS, dấu space đôi khi không cần encode tùy library, 
-    // nhưng cách nối chuỗi thủ công như trên thường khớp với VNPAY.
+  // Phải sử dụng hàm mã hóa để đảm bảo chuỗi ký khớp với chuỗi VNPAY đã tạo
+  .map(([k, v]) => `${k}=${encodeURIComponent(v)}`) 
+  .join("&"); 
 
-  const check = crypto
-    .createHmac("sha512", secret)
-    .update(Buffer.from(signData, 'utf-8')) // Đảm bảo encode utf-8
-    .digest("hex");
-
+const check = crypto
+  .createHmac("sha512", secret)
+  // LƯU Ý: Nếu dùng encodeURIComponent, cần đảm bảo bạn không encode double (encode lại lần nữa)
+  .update(Buffer.from(signData, 'utf-8')) 
+  .digest("hex");
   if (secureHash !== check) {
     console.error("❌ VNPAY IPN: Checksum failed");
     return NextResponse.json({ RspCode: "97", Message: "Invalid signature" });
