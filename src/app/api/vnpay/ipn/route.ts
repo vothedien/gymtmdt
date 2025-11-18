@@ -93,6 +93,7 @@ const check = crypto
     .eq("id", vnp_TxnRef);
 
   if (updateError) {
+    console.error("❌ SUPABASE UPDATE FAILED:", updateError);
     return NextResponse.json({ RspCode: "99", Message: "Database Error" });
   }
 
