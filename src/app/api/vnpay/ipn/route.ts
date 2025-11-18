@@ -13,54 +13,91 @@ function sortObject(obj: Record<string, string>) {
   return sorted;
 }
 
-// ❗ IPN = POST !!! 
-export async function POST(req: Request) {
-  const body = await req.formData(); // VNPay gửi form-encoded
-
+// ✅ VNPAY IPN sử dụng method GET
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  
+  // 1. Lấy dữ liệu từ Query Params
   const rawParams: Record<string, string> = {};
-  body.forEach((v, k) => (rawParams[k] = String(v)));
+  searchParams.forEach((value, key) => {
+    rawParams[key] = value;
+  });
 
   const secureHash = rawParams["vnp_SecureHash"];
-  const secret = process.env.VNP_HASH_SECRET!;
-  const vnp_TxnRef = rawParams["vnp_TxnRef"];
+  const vnp_TxnRef = rawParams["vnp_TxnRef"]; // Mã đơn hàng
+  const vnp_Amount = rawParams["vnp_Amount"]; // Số tiền (đã nhân 100)
+  const rspCode = rawParams["vnp_ResponseCode"];
 
+  // 2. Xóa các params không dùng để ký
   delete rawParams["vnp_SecureHash"];
   delete rawParams["vnp_SecureHashType"];
 
+  // 3. Kiểm tra Checksum (Chữ ký bảo mật)
+  const secret = process.env.VNP_HASH_SECRET!;
   const sorted = sortObject(rawParams);
-
+  
+  // Lưu ý: VNPAY dùng querystring chuẩn (mã hóa URI) khi tạo chữ ký
   const signData = Object.entries(sorted)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
+    .map(([k, v]) => `${k}=${v}`) // Nếu cần thiết: encodeURIComponent(v)
+    .join("&"); 
+    // Trong JS, dấu space đôi khi không cần encode tùy library, 
+    // nhưng cách nối chuỗi thủ công như trên thường khớp với VNPAY.
 
   const check = crypto
     .createHmac("sha512", secret)
-    .update(signData)
+    .update(Buffer.from(signData, 'utf-8')) // Đảm bảo encode utf-8
     .digest("hex");
 
   if (secureHash !== check) {
+    console.error("❌ VNPAY IPN: Checksum failed");
     return NextResponse.json({ RspCode: "97", Message: "Invalid signature" });
   }
 
-  const success =
-    rawParams["vnp_ResponseCode"] === "00" &&
-    rawParams["vnp_TransactionStatus"] === "00";
+  // 4. Lấy thông tin đơn hàng từ DB
+  const { data: invoice, error: fetchError } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", vnp_TxnRef)
+    .single();
 
-  const newStatus = success ? "paid" : "failed";
+  // Kịch bản 1: Đơn hàng không tồn tại
+  if (fetchError || !invoice) {
+    return NextResponse.json({ RspCode: "01", Message: "Order not found" });
+  }
 
-  const { error } = await supabase
+  // Kịch bản 2: Check số tiền (Quan trọng để tránh hack sửa giá)
+  // Lưu ý: vnp_Amount là string, đơn vị VNĐ * 100. Ví dụ 10000 VNĐ -> 1000000
+  const vnpAmountNumber = Number(vnp_Amount) / 100; 
+  if (vnpAmountNumber !== invoice.amount) { 
+     // invoice.amount là cột số tiền trong DB của bạn
+     return NextResponse.json({ RspCode: "04", Message: "Invalid amount" });
+  }
+
+  // Kịch bản 3: Đơn hàng đã được confirm rồi -> Không update lại
+  if (invoice.status !== "pending") { // Giả sử trạng thái chờ là 'pending'
+     return NextResponse.json({ RspCode: "02", Message: "Order already confirmed" });
+  }
+
+  // 5. Xử lý kết quả giao dịch
+  let updateStatus = "failed";
+  if (rspCode === "00") {
+    updateStatus = "paid";
+  }
+
+  const { error: updateError } = await supabase
     .from("invoices")
     .update({
-      status: newStatus,
+      status: updateStatus,
       transaction_id: rawParams["vnp_TransactionNo"],
       method: "VNPAY",
+      payment_date: new Date().toISOString(), // Nên lưu thời gian thanh toán
     })
     .eq("id", vnp_TxnRef);
 
-  if (error) {
+  if (updateError) {
     return NextResponse.json({ RspCode: "99", Message: "Database Error" });
   }
 
-  // 👇 TRẢ VỀ CHO VNPAY — KHÔNG REDIRECT
+  // ✅ Trả về đúng định dạng VNPAY yêu cầu
   return NextResponse.json({ RspCode: "00", Message: "Confirm Success" });
 }
