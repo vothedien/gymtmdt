@@ -88,7 +88,7 @@ const check = crypto
       status: updateStatus,
       transaction_id: rawParams["vnp_TransactionNo"],
       method: "VNPAY",
-      payment_date: new Date().toISOString(), // Nên lưu thời gian thanh toán
+      //payment_date: new Date().toISOString(), // Nên lưu thời gian thanh toán
     })
     .eq("id", vnp_TxnRef);
 
