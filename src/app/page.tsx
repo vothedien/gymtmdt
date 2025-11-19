@@ -55,8 +55,10 @@ export default function GymX() {
   );
   const [plans, setPlans] = useState<Plan[]>(defaultPlans);
   const [history, setHistory] = useState<InvoiceRow[]>([]);
-
-  const activePlan = useMemo(() => (isAuth ? "Pro" : null), [isAuth]);
+  const [membership, setMembership] = useState<{ plan: string | null; expiresAt: string | null }>({
+    plan: null,
+    expiresAt: null,
+  });
 
   // Auth session + listener
   useEffect(() => {
@@ -90,11 +92,32 @@ export default function GymX() {
 
   // Load invoices sau khi login
   useEffect(() => {
-    if (!userId) { setHistory([]); return; }
+    if (!userId) {
+      setHistory([]);
+      setMembership({ plan: null, expiresAt: null });
+      return;
+    }
+    const normalizeStatus = (value?: string | null) => (value ?? "").toLowerCase();
+    const isPaidStatus = (value?: string | null) => {
+      const status = normalizeStatus(value);
+      return ["paid", "success", "completed", "hoàn tất"].some((token) => status.includes(token));
+    };
+    const computeExpiry = (createdAt: string, period?: string | null) => {
+      const start = new Date(createdAt);
+      const months = (() => {
+        if (!period) return 1;
+        const numericPrefix = parseInt(period, 10);
+        if (!Number.isNaN(numericPrefix) && numericPrefix > 0) return numericPrefix;
+        return period.toLowerCase().includes("tháng") ? 1 : 1;
+      })();
+      start.setMonth(start.getMonth() + months);
+      return start.toLocaleDateString("vi-VN");
+    };
+
     const loadInv = async () => {
       const { data, error } = await supabase
         .from('invoices')
-        .select('id, plan_id, amount, method, status, created_at, plans(name)')
+        .select('id, plan_id, amount, method, status, created_at, plans(name, period)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (!error && data) {
@@ -105,7 +128,7 @@ export default function GymX() {
           method?: string | null;
           status?: string | null;
           created_at: string;
-          plans?: { name?: string | null } | null;
+          plans?: { name?: string | null; period?: string | null } | null;
         };
         const mapped = (data as InvoiceQueryRow[]).map((r) => ({
           id: r.id,
@@ -116,6 +139,16 @@ export default function GymX() {
           createdAt: new Date(r.created_at).toISOString().slice(0,16).replace('T',' '),
         }));
         setHistory(mapped);
+
+        const activeInvoice = (data as InvoiceQueryRow[]).find((invoice) => isPaidStatus(invoice.status));
+        if (activeInvoice) {
+          setMembership({
+            plan: activeInvoice.plans?.name ?? activeInvoice.plan_id,
+            expiresAt: computeExpiry(activeInvoice.created_at, activeInvoice.plans?.period),
+          });
+        } else {
+          setMembership({ plan: null, expiresAt: null });
+        }
       }
     };
     loadInv();
@@ -169,7 +202,7 @@ export default function GymX() {
 
           {isAuth && (
             <section id="dashboard" className="py-12 sm:py-16">
-              <Dashboard activePlan={activePlan} history={history} />
+              <Dashboard membership={membership} history={history} />
             </section>
           )}
         </main>
@@ -416,7 +449,13 @@ function Coaches() {
   );
 }
 
-function Dashboard({ activePlan, history }: { activePlan: string | null; history: InvoiceRow[] }) {
+function Dashboard({
+  membership,
+  history,
+}: {
+  membership: { plan: string | null; expiresAt: string | null };
+  history: InvoiceRow[];
+}) {
   return (
     <div>
       <div className="mb-8">
@@ -438,11 +477,11 @@ function Dashboard({ activePlan, history }: { activePlan: string | null; history
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-sm text-slate-500">Gói hiện tại</div>
-                <div className="mt-1 text-lg font-semibold">{activePlan ?? "Chưa đăng ký"}</div>
+                <div className="mt-1 text-lg font-semibold">{membership.plan ?? "Chưa đăng ký"}</div>
               </div>
               <div>
                 <div className="text-sm text-slate-500">Ngày hết hạn</div>
-                <div className="mt-1">{activePlan ? "10/11/2025" : "—"}</div>
+                <div className="mt-1">{membership.plan ? membership.expiresAt ?? "—" : "—"}</div>
               </div>
             </CardContent>
           </Card>
