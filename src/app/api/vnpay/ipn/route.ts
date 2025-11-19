@@ -1,13 +1,16 @@
-export const runtime = "nodejs";
+export const runtime = "nodejs"; // BẮT BUỘC — KHÔNG CÓ LÀ FAIL 100%.
+
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
+// Supabase với service role
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Hàm sort object theo key
 function sortObject(obj: Record<string, string>) {
   const sorted: Record<string, string> = {};
   Object.keys(obj).sort().forEach((k) => (sorted[k] = obj[k]));
@@ -15,75 +18,100 @@ function sortObject(obj: Record<string, string>) {
 }
 
 export async function GET(req: Request) {
+  console.log("🔥 VNPAY IPN HIT");
+
   const { searchParams } = new URL(req.url);
 
   const rawParams: Record<string, string> = {};
   searchParams.forEach((value, key) => (rawParams[key] = value));
+
+  console.log("Raw Params:", rawParams);
 
   const secureHash = rawParams["vnp_SecureHash"];
   const vnp_TxnRef = rawParams["vnp_TxnRef"];
   const vnp_Amount = rawParams["vnp_Amount"];
   const rspCode = rawParams["vnp_ResponseCode"];
 
+  // Xoá chữ ký trước khi build hash
   delete rawParams["vnp_SecureHash"];
   delete rawParams["vnp_SecureHashType"];
 
   const secret = process.env.VNP_HASH_SECRET!;
 
+  // Sort params
   const sorted = sortObject(rawParams);
 
-  // ❗ Không được encode URI
+  // Build sign data (KHÔNG encode)
   const signData = Object.entries(sorted)
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
 
+  console.log("Sign Data:", signData);
+
+  // Hash
   const check = crypto
     .createHmac("sha512", secret)
     .update(signData, "utf-8")
     .digest("hex");
 
+  console.log("Hash Check:", check);
+
+  // Sai signature
   if (secureHash !== check) {
+    console.log("❌ Wrong signature");
     return NextResponse.json({ RspCode: "97", Message: "Invalid signature" });
   }
 
-  // Lấy đơn hàng
-  const { data: invoice, error } = await supabase
+  // Lấy hóa đơn
+  const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
     .select("*")
     .eq("id", vnp_TxnRef)
     .single();
 
-  if (error || !invoice) {
+  console.log("Invoice:", invoice, "Error:", invoiceError);
+
+  if (invoiceError || !invoice) {
     return NextResponse.json({ RspCode: "01", Message: "Order not found" });
   }
 
-  // Check amount
+  // Check amount (VNPAY amount * 100)
   const vnpAmountNumber = Number(vnp_Amount) / 100;
 
   if (Number(invoice.amount) !== vnpAmountNumber) {
     return NextResponse.json({ RspCode: "04", Message: "Invalid amount" });
   }
 
-  // Đã confirm rồi
+  // Nếu đã xử lý rồi thì trả về 02
   if (invoice.status !== "pending") {
-    return NextResponse.json({ RspCode: "02", Message: "Order already confirmed" });
+    console.log("⏳ Order already confirmed");
+    return NextResponse.json({
+      RspCode: "02",
+      Message: "Order already confirmed",
+    });
   }
 
+  // Map trạng thái
   const newStatus = rspCode === "00" ? "paid" : "failed";
 
+  // Update DB
   const { error: updateError } = await supabase
     .from("invoices")
     .update({
       status: newStatus,
       transaction_id: rawParams["vnp_TransactionNo"],
       method: "VNPAY",
+      payment_date: new Date().toISOString(),
+      payload: rawParams
     })
     .eq("id", vnp_TxnRef);
 
   if (updateError) {
-    console.error(updateError);
+    console.log("❌ DB Error:", updateError);
     return NextResponse.json({ RspCode: "99", Message: "Database Error" });
   }
+
+  console.log("✅ Update success");
 
   return NextResponse.json({ RspCode: "00", Message: "Confirm Success" });
 }
