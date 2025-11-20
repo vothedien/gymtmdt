@@ -5,8 +5,9 @@ import crypto from "crypto";
 
 export async function POST(request: Request) {
   try {
-    // 1. Lấy số tiền từ client gửi lên
-    const { amount } = await request.json();
+    // 1. Lấy dữ liệu từ client gửi lên (ĐÃ SỬA)
+    // Chúng ta cần lấy cả orderId và orderInfo mà client đã tạo
+    const { amount, orderId: clientOrderId, orderInfo: clientOrderInfo } = await request.json();
 
     if (!amount) {
       return NextResponse.json(
@@ -15,8 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Lấy thông tin từ biến môi trường (.env.local)
-    // Đảm bảo bạn đã thêm các biến này vào file .env.local
+    // 2. Lấy thông tin từ biến môi trường
     const partnerCode = process.env.MOMO_PARTNER_CODE!;
     const accessKey = process.env.MOMO_ACCESS_KEY!;
     const secretKey = process.env.MOMO_SECRET_KEY!;
@@ -24,30 +24,29 @@ export async function POST(request: Request) {
     const redirectUrl = process.env.MOMO_REDIRECT_URL!;
     const ipnUrl = process.env.MOMO_IPN_URL!;
 
-    // 3. Chuẩn bị các tham số
-    const orderInfo = "Thanh toan don hang qua MoMo";
-    const orderId = partnerCode + new Date().getTime(); // Mã đơn hàng duy nhất
-    const requestId = orderId;
-    const requestType = "payWithATM"; // Hoặc "captureWallet" nếu dùng app MoMo
-    const extraData = ""; // Có thể để rỗng
+    // 3. Chuẩn bị các tham số (ĐÃ SỬA)
+    // Ưu tiên dùng thông tin từ Client gửi lên để khớp với Database
+    const orderInfo = clientOrderInfo || "Thanh toan don hang qua MoMo";
+    const orderId = clientOrderId || (partnerCode + new Date().getTime()); // Dùng mã INV... từ client
+    const requestId = orderId; // RequestId nên giống OrderId
+    const requestType = "payWithATM"; // Hoặc "captureWallet"
+    const extraData = ""; 
     const lang = "vi";
 
-    // 4. Tạo chuỗi rawHash để tạo chữ ký
-    // Thứ tự các trường PHẢI giống hệt như sau:
+    // 4. Tạo chuỗi rawHash
     const rawHash = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
 
     // 5. Tạo chữ ký (Signature)
-    // Đây là phần thay thế cho hash_hmac("sha256", $rawHash, $serectkey)
     const signature = crypto
       .createHmac("sha256", secretKey)
       .update(rawHash)
       .digest("hex");
 
-    // 6. Chuẩn bị body để gửi sang MoMo
+    // 6. Chuẩn bị body
     const requestBody = {
       partnerCode: partnerCode,
-      partnerName: "Test", // Tên test hoặc tên cửa hàng của bạn
-      storeId: "MomoTestStore", // Mã cửa hàng
+      partnerName: "GymX Store",
+      storeId: "GymX",
       requestId: requestId,
       amount: amount,
       orderId: orderId,
@@ -57,11 +56,10 @@ export async function POST(request: Request) {
       lang: lang,
       extraData: extraData,
       requestType: requestType,
-      signature: signature, // Chữ ký vừa tạo
+      signature: signature,
     };
 
     // 7. Gửi request sang MoMo
-    // Đây là phần thay thế cho cURL (execPostRequest)
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -72,11 +70,11 @@ export async function POST(request: Request) {
 
     const jsonResult = await response.json();
 
-    // 8. Trả payUrl về cho client
+    // 8. Trả kết quả về
+    // Tôi đổi key thành 'payUrl' để thống nhất với VNPAY, client của bạn sẽ dễ xử lý hơn
     if (jsonResult.payUrl) {
-      return NextResponse.json({ url: jsonResult.payUrl });
+      return NextResponse.json({ payUrl: jsonResult.payUrl }); 
     } else {
-      // Xử lý nếu MoMo trả về lỗi
       console.error("MoMo Error:", jsonResult);
       return NextResponse.json(
         { error: jsonResult.message || "Failed to create MoMo payment" },
@@ -84,7 +82,7 @@ export async function POST(request: Request) {
       );
     }
   } catch (error) {
-    console.error("Internal Server Error:", error);
+console.error("Internal Server Error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

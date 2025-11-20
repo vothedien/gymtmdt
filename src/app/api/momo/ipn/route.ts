@@ -4,16 +4,9 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // phải dùng SERVICE KEY mới update được
-);
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-
-    console.log("🔥 MoMo IPN Received:", body);
+    const data = await request.json();
 
     const {
       partnerCode,
@@ -26,95 +19,59 @@ export async function POST(req: Request) {
       resultCode,
       message,
       payType,
+      responseTime,
       extraData,
-      signature
-    } = body;
+      signature,
+    } = data;
 
-    // === 1. Verify Signature ===
-    const accessKey = process.env.MOMO_ACCESS_KEY!;
+    // 1. Lấy các Key từ biến môi trường
     const secretKey = process.env.MOMO_SECRET_KEY!;
+    const accessKey = process.env.MOMO_ACCESS_KEY!;
 
-    const rawHash =
-      `accessKey=${accessKey}` +
-      `&amount=${amount}` +
-      `&extraData=${extraData}` +
-      `&message=${message}` +
-      `&orderId=${orderId}` +
-      `&orderInfo=${orderInfo}` +
-      `&orderType=${orderType}` +
-      `&partnerCode=${partnerCode}` +
-      `&payType=${payType}` +
-      `&requestId=${requestId}` +
-      `&resultCode=${resultCode}` +
-      `&transId=${transId}`;
+    // 2. Tạo chữ ký để xác thực (Bắt buộc đúng thứ tự)
+    const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&message=${message}&orderId=${orderId}&orderInfo=${orderInfo}&orderType=${orderType}&partnerCode=${partnerCode}&payType=${payType}&requestId=${requestId}&responseTime=${responseTime}&resultCode=${resultCode}&transId=${transId}`;
 
-    const computedSignature = crypto
+    const generatedSignature = crypto
       .createHmac("sha256", secretKey)
-      .update(rawHash)
+      .update(rawSignature)
       .digest("hex");
 
-    if (signature !== computedSignature) {
-      console.error("❌ MoMo Signature Invalid");
-      return NextResponse.json(
-        {
-          partnerCode,
-          requestId,
-          orderId,
-          resultCode: 11,
-          message: "invalid signature",
-        },
-        { status: 200 } // MoMo KHÔNG CHO trả 400
-      );
+    if (generatedSignature !== signature) {
+      return NextResponse.json({ message: "Invalid signature" }, { status: 400 });
     }
 
-    // === 2. Update invoices ===
-    const success = resultCode === 0;
-
-    const { error } = await supabase
-      .from("invoices")
-      .update({
-        status: success ? "paid" : "failed",
-        method: "momo",
-        transaction_id: transId,
-        payload: body,
-        payment_date: new Date().toISOString(),
-      })
-      .eq("id", orderId);
-
-    if (error) {
-      console.error("❌ Supabase Update Error:", error);
-      return NextResponse.json(
-        {
-          partnerCode,
-          requestId,
-          orderId,
-          resultCode: 99,
-          message: "database error",
-        },
-        { status: 200 }
-      );
-    }
-
-    console.log("✅ Invoice Updated:", orderId);
-
-    // === 3. Response MoMo format ===
-    return NextResponse.json(
-      {
-        partnerCode,
-        requestId,
-        orderId,
-        resultCode: 0,
-        message: "success",
-      },
-      { status: 200 }
+    // 3. KHỞI TẠO SUPABASE ADMIN (Fix lỗi 500)
+    // Chúng ta tạo một client riêng với quyền Service Role để có thể update database
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-  } catch (err) {
-    console.error("💥 MoMo IPN ERROR:", err);
+    // 4. Xử lý kết quả
+    if (resultCode == 0) {
+      // Cập nhật trạng thái đơn hàng
+      const { error } = await supabaseAdmin
+        .from("invoices")
+        .update({
+          status: "paid",
+        })
+        .eq("id", orderId);
 
+      if (error) {
+        console.error("Supabase Admin Update Error:", error);
+        return NextResponse.json(
+          { message: "Database update failed" },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({ message: "IPN received" }, { status: 204 });
+  } catch (error) {
+    console.error("IPN Handler Error:", error);
     return NextResponse.json(
-      { resultCode: 99, message: "server error" },
-      { status: 200 }
+      { message: "Internal Server Error" },
+      { status: 500 }
     );
   }
 }
