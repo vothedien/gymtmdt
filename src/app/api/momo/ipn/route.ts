@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { supabase } from "@/lib/supabase";  // Nếu bạn muốn update invoices
+import { createClient } from "@supabase/supabase-js";
+
+// Supabase server role key
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
-    console.log("MoMo IPN Data:", body);
+    console.log("🔥 MoMo IPN:", body);
 
     const {
       partnerCode,
@@ -23,61 +28,59 @@ export async function POST(req: Request) {
       signature
     } = body;
 
-    // --- 1. Lấy key env ---
+    // 1. rawHash phải đúng thứ tự MoMo yêu cầu (tài liệu chính thức)
     const accessKey = process.env.MOMO_ACCESS_KEY!;
     const secretKey = process.env.MOMO_SECRET_KEY!;
 
-    // --- 2. Tạo raw hash để check signature ---
-    const rawHash = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&message=${message}&orderId=${orderId}&orderInfo=${orderInfo}&orderType=${orderType}&partnerCode=${partnerCode}&payType=${payType}&requestId=${requestId}&responseTime=${body.responseTime}&resultCode=${resultCode}&transId=${transId}`;
+    const rawHash =
+      `accessKey=${accessKey}` +
+      `&amount=${amount}` +
+      `&extraData=${extraData}` +
+      `&message=${message}` +
+      `&orderId=${orderId}` +
+      `&orderInfo=${orderInfo}` +
+      `&orderType=${orderType}` +
+      `&partnerCode=${partnerCode}` +
+      `&payType=${payType}` +
+      `&requestId=${requestId}` +
+      `&resultCode=${resultCode}` +
+      `&transId=${transId}`;
 
-    const checkSignature = crypto.createHmac("sha256", secretKey)
+    const computedSignature = crypto
+      .createHmac("sha256", secretKey)
       .update(rawHash)
       .digest("hex");
 
-    // --- 3. Kiểm tra chữ ký ---
-    if (checkSignature !== signature) {
-      console.error("MoMo Signature mismatch");
-      return NextResponse.json(
-        { message: "Signature invalid", resultCode: 11 },
-        { status: 400 }
-      );
+    if (computedSignature !== signature) {
+      console.error("❌ MoMo Signature Invalid");
+      return NextResponse.json({ message: "Invalid signature", resultCode: 11 });
     }
 
-    // --- 4. Xử lý giao dịch ---
-    if (resultCode === 0) {
-      console.log(`MoMo Payment Success: ${orderId}`);
+    // 2. Update DB
+    const isSuccess = resultCode === 0;
 
-      // OPTIONAL: Update Supabase nếu bạn dùng bảng invoices
-      await supabase.from("invoices")
-        .update({
-          status: "PAID",
-          transaction_id: transId,
-          method: "MOMO",
-          payload: body
-        })
-        .eq("id", orderId);
-    } else {
-      console.log(`MoMo Payment Failed: ${orderId}`);
-      await supabase.from("invoices")
-        .update({
-          status: "FAILED",
-          payload: body
-        })
-        .eq("id", orderId);
+    const { error: updateError } = await supabase
+      .from("invoices")
+      .update({
+        status: isSuccess ? "paid" : "failed",
+        method: "momo",
+        transaction_id: transId,
+        payload: body,
+        payment_date: new Date().toISOString()
+      })
+      .eq("id", orderId);
+
+    if (updateError) {
+      console.error("❌ Supabase Update Error:", updateError);
+      return NextResponse.json({ message: "DB error", resultCode: 99 });
     }
 
-    // --- 5. Phản hồi lại MoMo ---
-    return NextResponse.json({
-      message: "IPN received",
-      resultCode: 0
-    });
+    console.log("✅ Updated invoice:", orderId);
 
-  } catch (error) {
-    console.error("MoMo IPN ERROR:", error);
+    return NextResponse.json({ message: "IPN received", resultCode: 0 });
 
-    return NextResponse.json(
-      { message: "Server error", resultCode: 99 },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("💥 MoMo IPN Server Error:", err);
+    return NextResponse.json({ message: "Server error", resultCode: 99 });
   }
 }
