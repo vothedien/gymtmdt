@@ -5,6 +5,7 @@ import crypto from "crypto";
 
 export async function POST(request: Request) {
   try {
+    // 1. Lấy số tiền từ client gửi lên
     const { amount } = await request.json();
 
     if (!amount) {
@@ -14,84 +15,78 @@ export async function POST(request: Request) {
       );
     }
 
-    // === ENV ===
+    // 2. Lấy thông tin từ biến môi trường (.env.local)
+    // Đảm bảo bạn đã thêm các biến này vào file .env.local
     const partnerCode = process.env.MOMO_PARTNER_CODE!;
     const accessKey = process.env.MOMO_ACCESS_KEY!;
     const secretKey = process.env.MOMO_SECRET_KEY!;
     const endpoint = process.env.MOMO_ENDPOINT!;
-    const redirectUrl = process.env.MOMO_REDIRECT_URL!;  // trang return
-    const ipnUrl = process.env.MOMO_IPN_URL!;            // trang IPN
+    const redirectUrl = process.env.MOMO_REDIRECT_URL!;
+    const ipnUrl = process.env.MOMO_IPN_URL!;
 
-    // === Order info ===
-    const orderId = `${partnerCode}-${Date.now()}`;
+    // 3. Chuẩn bị các tham số
+    const orderInfo = "Thanh toan don hang qua MoMo";
+    const orderId = partnerCode + new Date().getTime(); // Mã đơn hàng duy nhất
     const requestId = orderId;
-    const requestType = "captureWallet"; // PHẢI DÙNG — ATM TEST KHÔNG GỬI IPN
-    const orderInfo = "Thanh toán đơn hàng";
-    const extraData = "";
+    const requestType = "payWithATM"; // Hoặc "captureWallet" nếu dùng app MoMo
+    const extraData = ""; // Có thể để rỗng
     const lang = "vi";
 
-    // === RAW SIGNATURE — PHẢI THEO ĐÚNG THỨ TỰ MỚI CHUẨN ===
-    const rawHash =
-      `accessKey=${accessKey}` +
-      `&amount=${amount}` +
-      `&extraData=${extraData}` +
-      `&ipnUrl=${ipnUrl}` +
-      `&orderId=${orderId}` +
-      `&orderInfo=${orderInfo}` +
-      `&partnerCode=${partnerCode}` +
-      `&redirectUrl=${redirectUrl}` +
-      `&requestId=${requestId}` +
-      `&requestType=${requestType}`;
+    // 4. Tạo chuỗi rawHash để tạo chữ ký
+    // Thứ tự các trường PHẢI giống hệt như sau:
+    const rawHash = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
 
-    // === CREATE SIGNATURE ===
+    // 5. Tạo chữ ký (Signature)
+    // Đây là phần thay thế cho hash_hmac("sha256", $rawHash, $serectkey)
     const signature = crypto
       .createHmac("sha256", secretKey)
       .update(rawHash)
       .digest("hex");
 
-    // === BODY REQUEST TO MOMO ===
+    // 6. Chuẩn bị body để gửi sang MoMo
     const requestBody = {
-      partnerCode,
-      partnerName: "MoMo Test",
-      storeId: "GYMTMDT-STORE",
-      requestId,
-      amount,
-      orderId,
-      orderInfo,
-      redirectUrl,
-      ipnUrl,
-      extraData,
-      requestType,
-      lang,
-      signature,
+      partnerCode: partnerCode,
+      partnerName: "Test", // Tên test hoặc tên cửa hàng của bạn
+      storeId: "MomoTestStore", // Mã cửa hàng
+      requestId: requestId,
+      amount: amount,
+      orderId: orderId,
+      orderInfo: orderInfo,
+      redirectUrl: redirectUrl,
+      ipnUrl: ipnUrl,
+      lang: lang,
+      extraData: extraData,
+      requestType: requestType,
+      signature: signature, // Chữ ký vừa tạo
     };
 
-    console.log("🔥 MoMo Create Payload:", requestBody);
-
+    // 7. Gửi request sang MoMo
+    // Đây là phần thay thế cho cURL (execPostRequest)
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(requestBody),
     });
 
-    const result = await response.json();
+    const jsonResult = await response.json();
 
-    console.log("🔥 MoMo Response:", result);
-
-    // === SUCCESS ===
-    if (result?.payUrl) {
-      return NextResponse.json({ url: result.payUrl });
+    // 8. Trả payUrl về cho client
+    if (jsonResult.payUrl) {
+      return NextResponse.json({ url: jsonResult.payUrl });
+    } else {
+      // Xử lý nếu MoMo trả về lỗi
+      console.error("MoMo Error:", jsonResult);
+      return NextResponse.json(
+        { error: jsonResult.message || "Failed to create MoMo payment" },
+        { status: 500 }
+      );
     }
-
-    // === ERROR FROM MOMO ===
+  } catch (error) {
+    console.error("Internal Server Error:", error);
     return NextResponse.json(
-      { error: result.message || "Create MoMo payment failed" },
-      { status: 500 }
-    );
-  } catch (err) {
-    console.error("💥 MoMo Create ERROR:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }
