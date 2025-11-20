@@ -124,7 +124,6 @@ function PaymentResultContent() {
   );
 }
 
-// Bắt buộc dùng Suspense khi dùng useSearchParams trong Next.js App Router
 export default function PaymentResult() {
   return (
     <Suspense fallback={<div className="flex h-screen items-center justify-center">Đang tải...</div>}>
