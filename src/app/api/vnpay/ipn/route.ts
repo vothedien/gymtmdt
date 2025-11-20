@@ -102,7 +102,7 @@ export async function GET(req: Request) {
       transaction_id: rawParams["vnp_TransactionNo"],
       method: "VNPAY",
       payment_date: new Date().toISOString(),
-      payload: rawParams
+     // payload: rawParams
     })
     .eq("id", vnp_TxnRef);
 
