@@ -305,7 +305,7 @@ export default function CheckoutPage() {
 
               <Card className="rounded-3xl bg-slate-900 text-slate-100">
                 <CardHeader>
-                  <CardTitle className="text-slate-100">Cam kết GymX</CardTitle>
+                  <CardTitle className="text-slate-100">Cam kết PowerFit Center</CardTitle>
                   <CardDescription className="text-slate-300">
                     Bạn luôn được hỗ trợ trong suốt hành trình tập luyện.
                   </CardDescription>
@@ -433,7 +433,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-blue-500" />
-                    Email: <a href="mailto:support@gymx.vn" className="font-medium text-slate-900">support@gymx.vn</a>
+                    Email: <a href="mailto:support@powerfitcenter.vn" className="font-medium text-slate-900">support@powerfitcenter.vn</a>
                   </div>
                   <Separator />
                   <p className="text-xs text-slate-500">

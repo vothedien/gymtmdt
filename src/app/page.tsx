@@ -234,7 +234,7 @@ function SiteHeader({ isAuth, onLogin, onSignup, onLogout }: {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Image src="/images/logo.jpg" alt="Logo" width={32} height={32} />
-          <span className="font-semibold tracking-tight">GymX</span>
+          <span className="font-semibold tracking-tight">PowerFit Center </span>
         </div>
 
         <nav className="hidden gap-6 text-sm font-medium sm:flex">
@@ -332,7 +332,7 @@ function AboutGym() {
   return (
     <div className="grid items-center gap-8 lg:grid-cols-2">
       <div className="grid gap-6">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Vì sao chọn GymX?</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Vì sao chọn PowerFit Center ?</h2>
         <p className="text-slate-600">Chúng tôi tập trung vào trải nghiệm: không gian rộng rãi, đội ngũ HLV nhiệt tình và hệ sinh thái số giúp bạn dễ dàng theo dõi và duy trì thói quen tập luyện.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           {items.map((it) => (
@@ -493,7 +493,7 @@ function Dashboard({
           <Card className="rounded-3xl">
             <CardHeader>
               <CardTitle>Hoá đơn</CardTitle>
-              <CardDescription>Toàn bộ giao dịch của bạn tại GymX.</CardDescription>
+              <CardDescription>Toàn bộ giao dịch của bạn tại PowerFit Center .</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -568,15 +568,15 @@ function SiteFooter() {
           <div>
             <div className="flex items-center gap-2">
               <Image src="/images/logo.jpg" alt="Logo" width={32} height={32} />
-                <span className="font-semibold tracking-tight">GymX</span>
+                <span className="font-semibold tracking-tight">PowerFit Center</span>
             </div>
-            <p className="mt-2 text-sm text-slate-600">© 2025 GymX. All rights reserved.</p>
+            <p className="mt-2 text-sm text-slate-600">© 2025 PowerFit Center. All rights reserved.</p>
           </div>
           <div>
             <div className="font-semibold">Liên hệ</div>
             <ul className="mt-2 space-y-1 text-sm text-slate-600">
               <li>Hotline: 1900 1234</li>
-              <li>Email: hello@gymx.vn</li>
+              <li>Email: hello@powerfitcenter.vn</li>
               <li>Địa chỉ: 123 Nguyễn Văn Cừ, Q5, TP.HCM</li>
             </ul>
           </div>
