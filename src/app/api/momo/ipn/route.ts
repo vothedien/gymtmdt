@@ -48,9 +48,19 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ message: "IPN received" }, { status: 200 });
-  } catch (error: any) {
-    // In lỗi chi tiết ra Terminal
-    console.error("-> LỖI CHẾT NGƯỜI (CRASH):", error.message);
-    return NextResponse.json({ message: "Crash: " + error.message }, { status: 500 });
+  } catch (error: unknown) {
+  console.error("-> LỖI CHẾT NGƯỜI (CRASH):", error);
+
+  if (error instanceof Error) {
+    return NextResponse.json(
+      { message: "Crash: " + error.message },
+      { status: 500 }
+    );
   }
+  return NextResponse.json(
+    { message: "Crash: Unknown error" },
+    { status: 500 }
+  );
 }
+
+}   
