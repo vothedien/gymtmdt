@@ -7,18 +7,13 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: Request) {
   try {
-    console.log("🔥 IPN HIT!");
+    console.log("🔥 IPN HIT");
 
-    // MoMo gửi dạng x-www-form-urlencoded
-    const form = await request.formData();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = Object.fromEntries(form);
-
-    console.log("📩 Momo sent:", data);
+    const data = await request.json();
+    console.log("📩 JSON IPN:", data);
 
     const {
       partnerCode,
-      accessKey,
       requestId,
       orderId,
       orderInfo,
@@ -31,47 +26,50 @@ export async function POST(request: Request) {
       responseTime,
       extraData,
       signature
-    } = data ;
+    } = data;
 
-    // Raw signature EXACT order from MoMo
+    // 🔥 KHÔNG LẤY accessKey TỪ data (LỖI)
+    const accessKey = process.env.MOMO_ACCESS_KEY!;
+
     const rawSignature =
-      `partnerCode=${partnerCode}` +
-      `&accessKey=${accessKey ?? process.env.MOMO_ACCESS_KEY}` +
-      `&requestId=${requestId}` +
+      `accessKey=${accessKey}` +
+      `&amount=${amount}` +
+      `&extraData=${extraData}` +
+      `&message=${message}` +
       `&orderId=${orderId}` +
       `&orderInfo=${orderInfo}` +
       `&orderType=${orderType}` +
-      `&transId=${transId}` +
-      `&amount=${amount}` +
-      `&message=${message}` +
-      `&localMessage=${message}` + // MoMo sometimes duplicates message
-      `&responseTime=${responseTime}` +
-      `&errorCode=${resultCode}` +
+      `&partnerCode=${partnerCode}` +
       `&payType=${payType}` +
-      `&extraData=${extraData}`;
+      `&requestId=${requestId}` +
+      `&responseTime=${responseTime}` +
+      `&resultCode=${resultCode}` +
+      `&transId=${transId}`;
+
+    console.log("🔍 RAW LOCAL:", rawSignature);
 
     const expectedSignature = crypto
       .createHmac("sha256", process.env.MOMO_SECRET_KEY!)
       .update(rawSignature)
       .digest("hex");
 
+    console.log("🔍 EXPECTED:", expectedSignature);
+    console.log("🔍 MOMO SENT:", signature);
+
     if (expectedSignature !== signature) {
-      console.error("❌ Wrong signature!");
-      return NextResponse.json(
-        { message: "Invalid signature", resultCode: -1 },
-        { status: 200 }
-      );
+      console.error("❌ Sai chữ ký!");
+      return NextResponse.json({ resultCode: -1, message: "Invalid signature" }, { status: 200 });
     }
 
-    console.log("✅ Signature OK → Updating DB...");
+    console.log("✅ SIGNATURE KHỚP!");
 
-    const db = createClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    if (resultCode === "0" || resultCode === 0) {
-      await db
+    if (String(resultCode) === "0") {
+      await supabase
         .from("invoices")
         .update({
           status: "paid",
@@ -82,17 +80,10 @@ export async function POST(request: Request) {
         .eq("id", orderId);
     }
 
-    console.log("🎉 DB Updated!");
+    return NextResponse.json({ resultCode: 0, message: "Confirm success" }, { status: 200 });
 
-    return NextResponse.json(
-      { message: "Confirm Success", resultCode: 0 },
-      { status: 200 }
-    );
   } catch (err) {
     console.error("💀 IPN error:", err);
-    return NextResponse.json(
-      { message: "Error", resultCode: 1 },
-      { status: 200 }
-    );
+    return NextResponse.json({ resultCode: 1, message: "Server error" }, { status: 200 });
   }
 }

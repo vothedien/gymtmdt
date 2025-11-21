@@ -503,6 +503,7 @@ function Dashboard({
                     <TableHead>Mã</TableHead>
                     <TableHead>Gói</TableHead>
                     <TableHead>Phương thức</TableHead>
+                    <TableHead>Trạng thái</TableHead> {/* <--- THÊM CỘT NÀY */}
                     <TableHead>Thời gian</TableHead>
                     <TableHead className="text-right">Số tiền</TableHead>
                   </TableRow>
@@ -513,6 +514,7 @@ function Dashboard({
                       <TableCell className="font-medium text-blue-600">{h.id}</TableCell>
                       <TableCell>{h.plan}</TableCell>
                       <TableCell>{h.method}</TableCell>
+                      <TableCell>{getStatusBadge(h.status)}</TableCell>
                       <TableCell>{h.createdAt}</TableCell>
                       <TableCell className="text-right">{formatVND(h.amount)}</TableCell>
                     </TableRow>
@@ -557,6 +559,7 @@ function Dashboard({
   );
 }
 
+
 function SiteFooter() {
   return (
     <footer className="mt-16 border-t">
@@ -587,6 +590,23 @@ function SiteFooter() {
       </div>
     </footer>
   );
+}
+function getStatusBadge(status: string) {
+  const s = status?.toLowerCase() || "";
+  
+  if (s === "paid" || s === "success" || s === "hoàn tất") {
+    return <Badge className="bg-green-500 hover:bg-green-600">Thành công</Badge>;
+  }
+  
+  if (s === "pending" || s === "chờ xử lý") {
+    return <Badge variant="outline" className="text-yellow-600 border-yellow-500 bg-yellow-50">Chờ thanh toán</Badge>;
+  }
+
+  if (s === "failed" || s === "thất bại") {
+    return <Badge variant="destructive">Thất bại</Badge>;
+  }
+
+  return <Badge variant="secondary">{status}</Badge>;
 }
 
 function AuthDialog({
