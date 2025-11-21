@@ -1,5 +1,5 @@
 'use client';
-
+import Image from "next/image";
 import React, { useMemo, useState, useEffect } from "react";
 import { MotionConfig, motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -233,7 +233,7 @@ function SiteHeader({ isAuth, onLogin, onSignup, onLogout }: {
     <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <Dumbbell className="h-6 w-6" />
+          <Image src="/images/logo.jpg" alt="Logo" width={32} height={32} />
           <span className="font-semibold tracking-tight">GymX</span>
         </div>
 
@@ -313,7 +313,7 @@ function Hero() {
           <div className="aspect-[4/3] w-full overflow-hidden rounded-3xl border shadow-xl">
             <img src="https://images.unsplash.com/photo-1558611848-73f7eb4001a1?q=80&w=1600&auto=format&fit=crop" alt="Gym hero" className="h-full w-full object-cover" />
           </div>
-          <div className="absolute -bottom-6 left-6 flex items-center gap-3 rounded-2xl bg-white p-3 shadow-lg">
+          <div className="absolute -bottom-0 left-6 flex items-center gap-3 rounded-2xl bg-white p-3 shadow-lg">
             <TrendingUp className="h-5 w-5" />
             <div className="text-sm">+132 hội viên mới tháng này</div>
           </div>
@@ -421,8 +421,8 @@ function Classes() {
 
 function Coaches() {
   const list = [
-    { name: "Linh PT", role: "Strength & Conditioning", avatar: "https://images.unsplash.com/photo-1600486913747-55e0876a2b6b?q=80&w=800&auto=format&fit=crop" },
-    { name: "An Yoga", role: "Yoga Alliance RYT-500", avatar: "https://images.unsplash.com/photo-1550525811-e5869dd03032?q=80&w=800&auto=format&fit=crop" },
+    { name: "Linh PT", role: "Strength & Conditioning", avatar: "images/phuoc.jpg" },
+    { name: "An Yoga", role: "Yoga Alliance RYT-500", avatar: "images/bao.jpg" },
     { name: "Khoa Coach", role: "Boxing & Conditioning", avatar: "https://images.unsplash.com/photo-1547721064-da6cfb341d50?q=80&w=800&auto=format&fit=crop" },
   ];
   return (
@@ -566,7 +566,10 @@ function SiteFooter() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-6 sm:grid-cols-3">
           <div>
-            <div className="flex items-center gap-2 font-semibold"><Dumbbell className="h-5 w-5" />GymX</div>
+            <div className="flex items-center gap-2">
+              <Image src="/images/logo.jpg" alt="Logo" width={32} height={32} />
+                <span className="font-semibold tracking-tight">GymX</span>
+            </div>
             <p className="mt-2 text-sm text-slate-600">© 2025 GymX. All rights reserved.</p>
           </div>
           <div>
