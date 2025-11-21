@@ -20,15 +20,16 @@ export async function POST(request: Request) {
 
     console.log("🔗 ipnUrl:", ipnUrl);
 
-    const orderInfo = clientOrderInfo || "Thanh toan don hang qua MoMo";
+    const orderInfo = clientOrderInfo || "Thanh toan don hang MoMo ATM";
     const orderId = clientOrderId || partnerCode + Date.now();
     const requestId = orderId;
 
-    const requestType = "payWithATM";
+    const requestType = "payWithATM"; // ATM NAPAS
 
     const extraData = "";
     const lang = "vi";
 
+    // rawHash CHUẨN NHẤT CHO ATM
     const rawHash =
       "accessKey=" + accessKey +
       "&amount=" + amount +
@@ -41,6 +42,9 @@ export async function POST(request: Request) {
       "&requestId=" + requestId +
       "&requestType=" + requestType;
 
+    console.log("🧾 rawHash:", rawHash);
+
+    // Signature
     const signature = crypto
       .createHmac("sha256", secretKey)
       .update(rawHash)
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
 
     const requestBody = {
       partnerCode,
-      partnerName: "GymX",
+      partnerName: "GymX Store",
       storeId: "GymX",
       requestId,
       amount,
@@ -62,7 +66,6 @@ export async function POST(request: Request) {
       signature,
     };
 
-    // DEBUG LOG
     console.log("📤 SENT TO MOMO:", requestBody);
 
     const response = await fetch(endpoint, {
@@ -74,12 +77,14 @@ export async function POST(request: Request) {
     const jsonResult = await response.json();
     console.log("📥 MOMO RESPONSE:", jsonResult);
 
+    // Nếu trả về payUrl → Success
     if (jsonResult.payUrl) {
       return NextResponse.json({ payUrl: jsonResult.payUrl });
     }
 
+    // Nếu ATM bank reject → báº¡n sẽ tháº¥y message táº¡i Ä‘Ã¢y
     return NextResponse.json(
-      { error: jsonResult.message || "Create failed" },
+      { error: jsonResult.message || "Create ATM failed", detail: jsonResult },
       { status: 500 }
     );
 
