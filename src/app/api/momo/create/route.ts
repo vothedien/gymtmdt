@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const secretKey = process.env.MOMO_SECRET_KEY!;
     const endpoint = process.env.MOMO_ENDPOINT!;
     const redirectUrl = process.env.MOMO_REDIRECT_URL!;
-    const notifyUrl = process.env.MOMO_IPN_URL!;
+    const ipnUrl = process.env.MOMO_IPN_URL!;
 
     // 3. Chuẩn bị các tham số (ĐÃ SỬA)
     // Ưu tiên dùng thông tin từ Client gửi lên để khớp với Database
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const lang = "vi";
 
     // 4. Tạo chuỗi rawHash
-    const rawHash = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&notifyUrl=${notifyUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
+    const rawHash = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
 
     // 5. Tạo chữ ký (Signature)
     const signature = crypto
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       orderId: orderId,
       orderInfo: orderInfo,
       redirectUrl: redirectUrl,
-      notifyUrl: notifyUrl,
+      ipnUrl: ipnUrl,
       lang: lang,
       extraData: extraData,
       requestType: requestType,
