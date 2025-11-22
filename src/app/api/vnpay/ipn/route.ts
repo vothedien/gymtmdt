@@ -1,14 +1,10 @@
-export const runtime = "nodejs"; // BẮT BUỘC — KHÔNG CÓ LÀ FAIL 100%.
+import { supabaseServer } from "@/lib/supabase-server";
+export const runtime = "nodejs"; // bắt buộc — VNPAY không chạy trong edge
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
 
-// Supabase với service role
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = supabaseServer;
 
 // Hàm sort object theo key
 function sortObject(obj: Record<string, string>) {
@@ -102,7 +98,7 @@ export async function GET(req: Request) {
       transaction_id: rawParams["vnp_TransactionNo"],
       method: "VNPAY",
       payment_date: new Date().toISOString(),
-      payload: rawParams
+      payload: rawParams,
     })
     .eq("id", vnp_TxnRef);
 

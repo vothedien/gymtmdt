@@ -1,13 +1,13 @@
-export const runtime = "nodejs";
+export const runtime = "nodejs"; 
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "@/lib/supabase-server";
 
 export async function POST(request: Request) {
   try {
-    console.log("🔥 IPN HIT");
+    console.log("🔥 MoMo IPN HIT");
 
     const data = await request.json();
     console.log("📩 JSON IPN:", data);
@@ -25,12 +25,13 @@ export async function POST(request: Request) {
       payType,
       responseTime,
       extraData,
-      signature
+      signature,
     } = data;
 
-    // 🔥 KHÔNG LẤY accessKey TỪ data (LỖI)
     const accessKey = process.env.MOMO_ACCESS_KEY!;
+    const secretKey = process.env.MOMO_SECRET_KEY!;
 
+    // Build raw signature đúng chuẩn MoMo
     const rawSignature =
       `accessKey=${accessKey}` +
       `&amount=${amount}` +
@@ -46,44 +47,71 @@ export async function POST(request: Request) {
       `&resultCode=${resultCode}` +
       `&transId=${transId}`;
 
-    console.log("🔍 RAW LOCAL:", rawSignature);
+    console.log("🔍 LOCAL RAW:", rawSignature);
 
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.MOMO_SECRET_KEY!)
+      .createHmac("sha256", secretKey)
       .update(rawSignature)
       .digest("hex");
 
-    console.log("🔍 EXPECTED:", expectedSignature);
-    console.log("🔍 MOMO SENT:", signature);
+    console.log("EXPECTED:", expectedSignature);
+    console.log("CLIENT SENT:", signature);
 
     if (expectedSignature !== signature) {
-      console.error("❌ Sai chữ ký!");
-      return NextResponse.json({ resultCode: -1, message: "Invalid signature" }, { status: 200 });
+      console.log("❌ Chữ ký KHÔNG KHỚP!");
+      return NextResponse.json(
+        { resultCode: -1, message: "Invalid signature" },
+        { status: 200 }
+      );
     }
 
-    console.log("✅ SIGNATURE KHỚP!");
+    console.log("✅ Chữ ký hợp lệ!");
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = supabaseServer;
 
+    // ❗ Chỉ update nếu thanh toán thành công
     if (String(resultCode) === "0") {
-      await supabase
+      const { error } = await supabase
         .from("invoices")
         .update({
           status: "paid",
           transaction_id: transId,
+          method: "MOMO",
           payment_date: new Date().toISOString(),
-          payload: data
+          payload: data,
+        })
+        .eq("id", orderId);
+
+      if (error) {
+        console.error("❌ DB ERROR:", error);
+        return NextResponse.json(
+          { resultCode: 1, message: "DB update error" },
+          { status: 200 }
+        );
+      }
+    } else {
+      // ❗ Trường hợp thanh toán FAILED
+      await supabase
+        .from("invoices")
+        .update({
+          status: "failed",
+          method: "MOMO",
+          payload: data,
         })
         .eq("id", orderId);
     }
 
-    return NextResponse.json({ resultCode: 0, message: "Confirm success" }, { status: 200 });
+    console.log("🔥 Hoàn tất cập nhật đơn:", orderId);
+    return NextResponse.json(
+      { resultCode: 0, message: "Confirm success" },
+      { status: 200 }
+    );
 
   } catch (err) {
-    console.error("💀 IPN error:", err);
-    return NextResponse.json({ resultCode: 1, message: "Server error" }, { status: 200 });
+    console.error("💀 MoMo IPN ERROR:", err);
+    return NextResponse.json(
+      { resultCode: 1, message: "Server error" },
+      { status: 200 }
+    );
   }
 }
