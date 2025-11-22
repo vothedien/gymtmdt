@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import {  supabaseServer } from "@/lib/supabase-server";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -7,7 +7,7 @@ export async function POST(req: Request) {
 
   const hash = crypto.createHash("sha256").update(password).digest("hex");
 
-  const { data: admin, error } = await supabase
+  const { data: admin, error } = await supabaseServer
     .from("admins")
     .select("*")
     .eq("email", email)
